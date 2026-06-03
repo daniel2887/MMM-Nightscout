@@ -185,7 +185,8 @@ Module.register("MMM-Nightscout", {
                 position: "left",
                 backgroundColor: "rgba(0, 0, 0, 0.5)",
                 fontColor: "rgba(255, 255, 255, 0.8)",
-                fontSize: 8,
+                fontSize: 12,
+                fontStyle: "normal",
                 xPadding: 3,
                 yPadding: 2,
                 cornerRadius: 2
@@ -206,7 +207,8 @@ Module.register("MMM-Nightscout", {
                 position: "left",
                 backgroundColor: "rgba(0, 0, 0, 0.5)",
                 fontColor: "rgba(255, 255, 255, 0.8)",
-                fontSize: 8,
+                fontSize: 12,
+                fontStyle: "normal",
                 xPadding: 3,
                 yPadding: 2,
                 cornerRadius: 2
@@ -227,7 +229,8 @@ Module.register("MMM-Nightscout", {
                 position: "left",
                 backgroundColor: "rgba(0, 0, 0, 0.5)",
                 fontColor: "rgba(255, 255, 255, 0.8)",
-                fontSize: 8,
+                fontSize: 12,
+                fontStyle: "normal",
                 xPadding: 3,
                 yPadding: 2,
                 cornerRadius: 2
@@ -248,7 +251,8 @@ Module.register("MMM-Nightscout", {
                 position: "left",
                 backgroundColor: "rgba(0, 0, 0, 0.5)",
                 fontColor: "rgba(255, 255, 255, 0.8)",
-                fontSize: 8,
+                fontSize: 12,
+                fontStyle: "normal",
                 xPadding: 3,
                 yPadding: 2,
                 cornerRadius: 2
