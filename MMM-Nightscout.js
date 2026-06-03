@@ -20,7 +20,9 @@ Module.register("MMM-Nightscout", {
     bgTargetTop: 180,
     bgTargetBottom: 70,
     timeFormat: 24,
-    customTitle: "Dexcom Share"
+    customTitle: "Dexcom Share",
+    yMax: false,
+    yMin: false
   },
 
   getScripts: function() {
@@ -259,8 +261,8 @@ Module.register("MMM-Nightscout", {
               typ: "logarithmic",
               ticks: {
                 beginAtZero: true,
-                max: units == "mmol" ? 18 : 400,
-                min: units == "mmol" ? 2 : 30
+                max: this.config.yMax !== false ? this.config.yMax : (units == "mmol" ? 18 : 400),
+                min: this.config.yMin !== false ? this.config.yMin : (units == "mmol" ? 2 : 30)
               },
               display: true,
               scaleLabel: {

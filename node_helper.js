@@ -10,12 +10,17 @@ function request(options) {
     let isHttps = parsedUrl.protocol === "https:";
     let client = isHttps ? https : http;
 
+    let headers = Object.assign({}, options.headers);
+    if (options.body) {
+      headers["Content-Length"] = Buffer.byteLength(options.body);
+    }
+
     let reqOptions = {
       method: options.method || "GET",
       hostname: parsedUrl.hostname,
       port: parsedUrl.port || (isHttps ? 443 : 80),
       path: parsedUrl.path,
-      headers: options.headers || {}
+      headers: headers
     };
 
     let req = client.request(reqOptions, (res) => {
@@ -31,6 +36,11 @@ function request(options) {
           reject(err);
         }
       });
+    });
+
+    req.setTimeout(options.timeout || 30000, () => {
+      req.destroy();
+      reject(new Error("Timeout"));
     });
 
     req.on("error", (err) => {
@@ -467,17 +477,29 @@ function debug(msg) {
 const DEXCOM_APP_ID = "d89443d2-327c-4a6f-89e5-496bbb0317db";
 const DEXCOM_AGENT = "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0";
 
-function mapDexcomTrendToDirection(trendInt) {
+function mapDexcomTrendToDirection(trend) {
+  if (trend === undefined || trend === null) return "NONE";
   const mapping = {
-    1: "DoubleUp",
-    2: "SingleUp",
-    3: "FortyFiveUp",
-    4: "Flat",
-    5: "FortyFiveDown",
-    6: "SingleDown",
-    7: "DoubleDown",
-    8: "NONE",
-    9: "RATE OUT OF RANGE"
+    "1": "DoubleUp",
+    "2": "SingleUp",
+    "3": "FortyFiveUp",
+    "4": "Flat",
+    "5": "FortyFiveDown",
+    "6": "SingleDown",
+    "7": "DoubleDown",
+    "8": "NONE",
+    "9": "RATE OUT OF RANGE",
+    "DOUBLEUP": "DoubleUp",
+    "SINGLEUP": "SingleUp",
+    "FORTYFIVEUP": "FortyFiveUp",
+    "FLAT": "Flat",
+    "FORTYFIVEDOWN": "FortyFiveDown",
+    "SINGLEDOWN": "SingleDown",
+    "DOUBLEDOWN": "DoubleDown",
+    "NONE": "NONE",
+    "NOT COMPUTABLE": "NONE",
+    "RATE OUT OF RANGE": "RATE OUT OF RANGE"
   };
-  return mapping[trendInt] || "NONE";
+  const key = trend.toString().toUpperCase().trim();
+  return mapping[key] || "NONE";
 }

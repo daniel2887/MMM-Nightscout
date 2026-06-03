@@ -59,7 +59,9 @@ modules: [
                 renderChart: true,  //Optional: set to false if you dont want to get a chart. Default is true.
                 showTIR: false, //Optional: set to true if you want to display TIR for the last <chartHours> number of hours.
                 units: false, //Optional: set to "mmol" to overwrite settings and display data in mmol/L.
-                extendedHeader: false //Option: set to false if you want to hide server title and last glucose value.
+                extendedHeader: false, //Option: set to false if you want to hide server title and last glucose value.
+                yMax: false, //Optional: override maximum Y-axis value on the chart. Default is false (auto: 400 for mg/dL, 18 for mmol/L)
+                yMin: false //Optional: override minimum Y-axis value on the chart. Default is false (auto: 30 for mg/dL, 2 for mmol/L)
         }
     },
     ...
