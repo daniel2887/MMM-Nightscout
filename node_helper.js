@@ -98,9 +98,140 @@ module.exports = NodeHelper.create({
       }
     });
   },
+
+  // --------------------------------------- Login to Dexcom Share API
+  loginDexcom: async function() {
+    let self = this;
+    let url = `https://${self.config.server}/ShareWebServices/Services/General/LoginPublisherAccountByName`;
+    let options = {
+      method: "POST",
+      uri: url,
+      headers: {
+        "User-Agent": DEXCOM_AGENT,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify({
+        accountName: self.config.username,
+        password: self.config.password,
+        applicationId: DEXCOM_APP_ID
+      })
+    };
+    try {
+      let body = await request(options);
+      return body.replace(/"/g, "").trim();
+    } catch (error) {
+      log("loginDexcom: failed to login: " + error);
+      self.sendSocketNotification("SERVICE_FAILURE", {
+        resp: {
+          StatusCode: error.statusCode || 500,
+          Message: "Dexcom Login Failed"
+        }
+      });
+      return;
+    }
+  },
+
+  // --------------------------------------- Fetch glucose data from Dexcom Share API
+  getDexcomData: async function(sessionId) {
+    let self = this;
+    if (!sessionId) return;
+    let maxCount = self.config.chartHours * 12;
+    let minutes = Math.max(1440, self.config.chartHours * 60);
+    let url = `https://${self.config.server}/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionID=${sessionId}&minutes=${minutes}&maxCount=${maxCount}`;
+    let options = {
+      method: "POST",
+      uri: url,
+      headers: {
+        "User-Agent": DEXCOM_AGENT,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Content-Length": "0"
+      }
+    };
+    try {
+      let body = await request(options);
+      return JSON.parse(body);
+    } catch (error) {
+      log("getDexcomData: failed to fetch data: " + error);
+      self.sendSocketNotification("SERVICE_FAILURE", {
+        resp: {
+          StatusCode: error.statusCode || 500,
+          Message: "Dexcom Data Fetch Failed"
+        }
+      });
+      return;
+    }
+  },
+
+  // --------------------------------------- Dexcom specific update loop
+  updateDexcom: async function() {
+    let self = this;
+    clearInterval(self.updatetimer);
+
+    if (!self.config.username || !self.config.password) {
+      log("Missing username or password in configuration for Dexcom");
+      self.sendSocketNotification("SERVICE_FAILURE", {
+        resp: {
+          StatusCode: 400,
+          Message: "Dexcom config missing username/password"
+        }
+      });
+      self.scheduleUpdate();
+      return;
+    }
+
+    if (!self.sessionId) {
+      self.sessionId = await self.loginDexcom();
+    }
+
+    if (self.sessionId) {
+      let dexcomRaw = await self.getDexcomData(self.sessionId);
+      // If data fetch failed, session might have expired. Clear sessionId and retry login/fetch once.
+      if (!dexcomRaw) {
+        log("Dexcom fetch failed, attempting to re-login...");
+        self.sessionId = await self.loginDexcom();
+        if (self.sessionId) {
+          dexcomRaw = await self.getDexcomData(self.sessionId);
+        }
+      }
+
+      if (dexcomRaw && dexcomRaw.length > 0) {
+        self.glucoseData = dexcomRaw.map(r => ({
+          sgv: r.Value,
+          date: parseInt(r.WT.match(/\((.*)\)/)[1]),
+          direction: mapDexcomTrendToDirection(r.Trend),
+          trend: r.Trend
+        }));
+
+        let settings = {
+          thresholds: {
+            bgHigh: self.config.bgHigh,
+            bgLow: self.config.bgLow,
+            bgTargetTop: self.config.bgTargetTop,
+            bgTargetBottom: self.config.bgTargetBottom
+          },
+          timeFormat: self.config.timeFormat,
+          customTitle: self.config.customTitle
+        };
+
+        let units = self.config.units || "mg/dL";
+        let dto = generateDto(self.glucoseData, units, settings.thresholds, settings);
+        debug(JSON.stringify(dto));
+        debug("bs value is: " + dto.bs + " " + dto.unit);
+        self.sendSocketNotification("GLUCOSE", dto);
+      }
+    }
+    self.scheduleUpdate();
+  },
+
   // --------------------------------------- Init
   update: async function() {
     let self = this;
+    if (self.config.dataSource === "dexcom") {
+      await self.updateDexcom();
+      return;
+    }
     if (self.config.baseUrl && self.config.server.settings.units) {
       clearInterval(self.updatetimer); // Clear the timer so that we can set it again
       let glucoseData = await self.getGlucoseData();
@@ -129,9 +260,13 @@ module.exports = NodeHelper.create({
   // --------------------------------------- Init
   init: async function() {
     let self = this;
-    if (self.started && self.config.baseUrl) {
-      self.config.server = await self.getServerConfig();
-      await self.update();
+    if (self.started) {
+      if (self.config.dataSource === "dexcom") {
+        await self.update();
+      } else if (self.config.baseUrl) {
+        self.config.server = await self.getServerConfig();
+        await self.update();
+      }
     }
   },
   // --------------------------------------- Handle notifications
@@ -184,9 +319,11 @@ function generateDto(data, unit, thresholds, settings) {
   return {
     bs: unit == "mmol" ? convertSvgToMmol(data[0].sgv) : data[0].sgv,
     delta:
-      unit == "mmol"
-        ? convertSvgToMmol(data[0].sgv - data[1].sgv)
-        : data[0].sgv - data[1].sgv,
+      data.length > 1
+        ? (unit == "mmol"
+          ? convertSvgToMmol(data[0].sgv - data[1].sgv)
+          : data[0].sgv - data[1].sgv)
+        : 0,
     unit: unit,
     date: data[0].date,
     trend: data[0].trend,
@@ -282,4 +419,22 @@ function log(msg) {
 // --------------------------------------- Debugging
 function debug(msg) {
   if (debugMe) log(msg);
+}
+
+const DEXCOM_APP_ID = "d89443d2-327c-4a6f-89e5-496bbb0317db";
+const DEXCOM_AGENT = "Dexcom Share/3.0.2.11 CFNetwork/711.2.23 Darwin/14.0.0";
+
+function mapDexcomTrendToDirection(trendInt) {
+  const mapping = {
+    1: "DoubleUp",
+    2: "SingleUp",
+    3: "FortyFiveUp",
+    4: "Flat",
+    5: "FortyFiveDown",
+    6: "SingleDown",
+    7: "DoubleDown",
+    8: "NONE",
+    9: "RATE OUT OF RANGE"
+  };
+  return mapping[trendInt] || "NONE";
 }

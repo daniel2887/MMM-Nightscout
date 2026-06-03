@@ -10,7 +10,17 @@ Module.register("MMM-Nightscout", {
     token: false,
     showTIR: false,
     units: false,
-    extendedHeader: true
+    extendedHeader: true,
+    dataSource: "nightscout",
+    username: "",
+    password: "",
+    server: "share2.dexcom.com",
+    bgHigh: 180,
+    bgLow: 70,
+    bgTargetTop: 180,
+    bgTargetBottom: 70,
+    timeFormat: 24,
+    customTitle: "Dexcom Share"
   },
 
   getScripts: function() {
@@ -42,7 +52,13 @@ Module.register("MMM-Nightscout", {
       return wrapper;
     }
     if (this.failure) {
-      wrapper.innerHTML = "Connection to Nightscout failed. Please review logs";
+      let failMsg = "Connection failed. Please review logs";
+      if (typeof this.failure === "string") {
+        failMsg = this.failure;
+      } else if (this.failure && this.failure.resp && this.failure.resp.Message) {
+        failMsg = this.failure.resp.Message;
+      }
+      wrapper.innerHTML = failMsg;
       wrapper.className = "dimmed light small";
       return wrapper;
     }
