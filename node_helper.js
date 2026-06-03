@@ -1,5 +1,48 @@
 const NodeHelper = require("node_helper");
-const request = require("request-promise");
+const http = require("http");
+const https = require("https");
+const url = require("url");
+
+function request(options) {
+  return new Promise((resolve, reject) => {
+    let uri = options.uri || options.url;
+    let parsedUrl = url.parse(uri);
+    let isHttps = parsedUrl.protocol === "https:";
+    let client = isHttps ? https : http;
+
+    let reqOptions = {
+      method: options.method || "GET",
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port || (isHttps ? 443 : 80),
+      path: parsedUrl.path,
+      headers: options.headers || {}
+    };
+
+    let req = client.request(reqOptions, (res) => {
+      let chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => {
+        let body = Buffer.concat(chunks).toString();
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(body);
+        } else {
+          let err = new Error(body);
+          err.statusCode = res.statusCode;
+          reject(err);
+        }
+      });
+    });
+
+    req.on("error", (err) => {
+      reject(err);
+    });
+
+    if (options.body) {
+      req.write(options.body);
+    }
+    req.end();
+  });
+}
 
 var debugMe = false;
 
