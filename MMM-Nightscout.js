@@ -180,7 +180,15 @@ Module.register("MMM-Nightscout", {
               borderColor: "rgba(242, 241, 239, 0.5)",
               borderWidth: 1,
               label: {
-                enabled: false
+                enabled: true,
+                content: bgLow,
+                position: "left",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                fontColor: "rgba(255, 255, 255, 0.8)",
+                fontSize: 8,
+                xPadding: 3,
+                yPadding: 2,
+                cornerRadius: 2
               }
             },
             {
@@ -193,7 +201,15 @@ Module.register("MMM-Nightscout", {
               borderColor: "rgba(242, 241, 239, 0.5)",
               borderWidth: 1,
               label: {
-                enabled: false
+                enabled: true,
+                content: bgHigh,
+                position: "left",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                fontColor: "rgba(255, 255, 255, 0.8)",
+                fontSize: 8,
+                xPadding: 3,
+                yPadding: 2,
+                cornerRadius: 2
               }
             },
             {
@@ -206,7 +222,15 @@ Module.register("MMM-Nightscout", {
               borderColor: "rgba(242, 241, 239, 0.5)",
               borderWidth: 1,
               label: {
-                enabled: false
+                enabled: true,
+                content: targetBottom,
+                position: "left",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                fontColor: "rgba(255, 255, 255, 0.8)",
+                fontSize: 8,
+                xPadding: 3,
+                yPadding: 2,
+                cornerRadius: 2
               }
             },
             {
@@ -219,7 +243,15 @@ Module.register("MMM-Nightscout", {
               borderColor: "rgba(242, 241, 239, 0.5)",
               borderWidth: 1,
               label: {
-                enabled: false
+                enabled: true,
+                content: targetTop,
+                position: "left",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                fontColor: "rgba(255, 255, 255, 0.8)",
+                fontSize: 8,
+                xPadding: 3,
+                yPadding: 2,
+                cornerRadius: 2
               }
             }
           ]
@@ -263,6 +295,10 @@ Module.register("MMM-Nightscout", {
                 beginAtZero: true,
                 max: this.config.yMax !== false ? this.config.yMax : (units == "mmol" ? 18 : 400),
                 min: this.config.yMin !== false ? this.config.yMin : (units == "mmol" ? 2 : 30)
+              },
+              gridLines: {
+                display: true,
+                color: "rgba(128, 128, 128, 0.15)"
               },
               display: true,
               scaleLabel: {

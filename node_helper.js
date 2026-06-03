@@ -367,6 +367,14 @@ function directionToUnicode(direction) {
   }
 }
 
+function formatDelta(deltaVal) {
+  let num = parseFloat(deltaVal);
+  if (num > 0) {
+    return "+" + deltaVal;
+  }
+  return deltaVal.toString();
+}
+
 function generateDto(data, unit, thresholds, settings) {
   debug(JSON.stringify(data));
   return {
@@ -374,9 +382,9 @@ function generateDto(data, unit, thresholds, settings) {
     delta:
       data.length > 1
         ? (unit == "mmol"
-          ? convertSvgToMmol(data[0].sgv - data[1].sgv)
-          : data[0].sgv - data[1].sgv)
-        : 0,
+          ? formatDelta(convertSvgToMmol(data[0].sgv - data[1].sgv))
+          : formatDelta(data[0].sgv - data[1].sgv))
+        : "0",
     unit: unit,
     date: data[0].date,
     trend: data[0].trend,
