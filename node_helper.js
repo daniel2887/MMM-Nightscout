@@ -62,12 +62,14 @@ module.exports = NodeHelper.create({
     this.started = false;
   },
   // --------------------------------------- Schedule a stands update
-  scheduleUpdate: function() {
+  scheduleUpdate: function(delay) {
     let self = this;
-    self.updatetimer = setInterval(function() {
+    clearTimeout(self.updatetimer);
+    let timeout = delay !== undefined ? delay : 60000;
+    self.updatetimer = setTimeout(function() {
       // This timer is saved in uitimer so that we can cancel it
       self.update();
-    }, 60000);
+    }, timeout);
   },
   // --------------------------------------- Get Nightscout server configs
   getServerConfig: async function() {
@@ -190,7 +192,7 @@ module.exports = NodeHelper.create({
     let self = this;
     if (!sessionId) return;
     let maxCount = self.config.chartHours * 12;
-    let minutes = Math.max(1440, self.config.chartHours * 60);
+    let minutes = self.config.chartHours * 60 + 30;
     let url = `https://${self.config.server}/ShareWebServices/Services/Publisher/ReadPublisherLatestGlucoseValues?sessionID=${sessionId}&minutes=${minutes}&maxCount=${maxCount}`;
     let options = {
       method: "POST",
@@ -220,7 +222,7 @@ module.exports = NodeHelper.create({
   // --------------------------------------- Dexcom specific update loop
   updateDexcom: async function() {
     let self = this;
-    clearInterval(self.updatetimer);
+    clearTimeout(self.updatetimer);
 
     if (!self.config.username || !self.config.password) {
       log("Missing username or password in configuration for Dexcom");
@@ -230,13 +232,15 @@ module.exports = NodeHelper.create({
           Message: "Dexcom config missing username/password"
         }
       });
-      self.scheduleUpdate();
+      self.scheduleUpdate(30000);
       return;
     }
 
     if (!self.sessionId) {
       self.sessionId = await self.loginDexcom();
     }
+
+    let nextDelay = 30000; // Default retry is 30 seconds
 
     if (self.sessionId) {
       let dexcomRaw = await self.getDexcomData(self.sessionId);
@@ -250,12 +254,21 @@ module.exports = NodeHelper.create({
       }
 
       if (dexcomRaw && dexcomRaw.length > 0) {
-        self.glucoseData = dexcomRaw.map(r => ({
-          sgv: r.Value,
-          date: parseInt(r.WT.match(/\((.*)\)/)[1]),
-          direction: mapDexcomTrendToDirection(r.Trend),
-          trend: r.Trend
-        }));
+        self.glucoseData = dexcomRaw.map(r => {
+          let dateMs = Date.now();
+          if (r.WT) {
+            let match = r.WT.match(/\((.*)\)/);
+            if (match && match[1]) {
+              dateMs = parseInt(match[1]);
+            }
+          }
+          return {
+            sgv: r.Value,
+            date: dateMs,
+            direction: mapDexcomTrendToDirection(r.Trend),
+            trend: r.Trend
+          };
+        });
 
         let settings = {
           thresholds: {
@@ -273,9 +286,33 @@ module.exports = NodeHelper.create({
         debug(JSON.stringify(dto));
         debug("bs value is: " + dto.bs + " " + dto.unit);
         self.sendSocketNotification("GLUCOSE", dto);
+
+        // Calculate dynamic delay based on the latest reading's timestamp
+        let latestTime = self.glucoseData[0].date;
+        let nextExpected = latestTime + 300000; // 5 minutes
+        let now = Date.now();
+        let delay = nextExpected - now;
+        if (delay > 0) {
+          // Add a 15-second buffer to allow server upload processing
+          nextDelay = delay + 15000;
+          if (nextDelay > 315000) {
+            nextDelay = 315000; // Cap at 5 min 15 sec
+          }
+          log("Dexcom: Next reading expected in " + Math.round(delay / 1000) + "s. Scheduling update in " + Math.round(nextDelay / 1000) + "s.");
+        } else {
+          // Overdue reading. Retry in 30 seconds.
+          nextDelay = 30000;
+          log("Dexcom: Reading is overdue. Retrying in 30s.");
+        }
+      } else {
+        log("Dexcom: No data received or invalid format. Retrying in 30s.");
+        nextDelay = 30000;
       }
+    } else {
+      log("Dexcom: Session ID is missing. Retrying in 30s.");
+      nextDelay = 30000;
     }
-    self.scheduleUpdate();
+    self.scheduleUpdate(nextDelay);
   },
 
   // --------------------------------------- Init
@@ -286,7 +323,7 @@ module.exports = NodeHelper.create({
       return;
     }
     if (self.config.baseUrl && self.config.server.settings.units) {
-      clearInterval(self.updatetimer); // Clear the timer so that we can set it again
+      clearTimeout(self.updatetimer); // Clear the timer so that we can set it again
       let glucoseData = await self.getGlucoseData();
       if (glucoseData) {
         self.glucoseData = glucoseData;
